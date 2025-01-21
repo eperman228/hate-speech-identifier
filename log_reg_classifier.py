@@ -34,12 +34,25 @@ set_threshold = 0.5
 #report FPR over mini_demographic
 #predict on test
 
-def preprocess(text: pd.Series) -> pd.Series:
-    #nltk.download('stopwords')
+def preprocess(df: pd.DataFrame) -> pd.DataFrame:
+    """Preprocess data by tokenizing, lowercasing, and removing stopwords. 
+
+    Args:
+        df (pd.Dataframe): Pandas dataframe of containing 'text' column to process.
+
+    Returns:
+        pd.Dataframe: Original df with new column 'clean_text'.
+    """
+    nltk.download('stopwords')
     stop_words = set(stopwords.words('english'))
     stop_words.add("user")
 
-    text = text.str.lower()
+    text = df['text'].str.lower()
+    
+    def remove_punctuation(tweet):
+        return ''.join(char for char in tweet if char not in string.punctuation)
+
+    text = text.apply(remove_punctuation)
 
     text = text.apply(word_tokenize)
     
@@ -48,42 +61,81 @@ def preprocess(text: pd.Series) -> pd.Series:
 
     text = text.apply(filter_stopwords)
     
-    return text
+    df['clean_text'] = text
+    return df
 
-def count_punctuation(text:pd.Series):#-> pd.Series, pd.DataFrame:
+def count_punctuation(df:pd.DataFrame)-> pd.DataFrame:
+    """Counts the number of punctuation marks in each tweet and removes them. 
+
+    Args:
+        df (pd.Dataframe): Pandas df containing a column called "text".
+        
+    Returns:
+        pd.Dataframe: Pandas dataframe with punctuation counts
+    """
     punctuation = string.punctuation
 
     def count_tweet(tweet): 
         punct_count =  Counter(char for char in tweet if char in punctuation)
         return {p: punct_count.get(p, 0) for p in punctuation}
 
+    text = df['text']
+    
     punctuation_counts = text.apply(count_tweet)
     
     X_counts = pd.DataFrame(punctuation_counts.tolist(), columns=list(punctuation))
-        
+
+    X_feature = pd.merge(df, X_counts, left_index=True, right_index=True)
+    
+    return X_feature
+
+def capital_ratio(df: pd.DataFrame)->pd.DataFrame:
+    """Generates new column with the ratio of capital to non-capital letters.
+
+    Args:
+        df (pd.DataFrame): Pandas df containing the columm 'text'
+
+    Returns:
+        pd.DataFrame: Same df with a new column 'capitals'
+    """
+    #remove punctuation to prevent skew
     def remove_punctuation(tweet):
-        return ''.join(char for char in tweet if char not in punctuation)
+        return ''.join(char for char in tweet if char not in string.punctuation)
 
-    text = text.apply(remove_punctuation)
+    text = df['text'].apply(remove_punctuation)
     
-    return text, X_counts
-
-def count_profanity(tweet):
-    return sum(1 for word in tweet if word in profane_words)
+    #remove @USER to prevent skew
+    def remove_user(tweet: str):
+        return tweet.replace("USER", "")
     
-def capital_ratio(tweet):
-    total_chars = len(tweet)
-    upper_chars = sum(1 for char in tweet if char.isupper())
-    return upper_chars / total_chars if total_chars > 0 else 0
+    text = text.apply(remove_user)
 
-def sentiment_analysis(text, df):
-    #nltk.download('vader_lexicon')
+    #helper function to calculate capital ratio
+    def cap_count(tweet: str) -> float:
+        total_chars = len(tweet)
+        upper_chars = sum(1 for char in tweet if char.isupper())
+        return upper_chars / total_chars if total_chars > 0 else 0
+
+    df['capitals'] = text.apply(cap_count)
+    return df
+
+def sentiment_analysis(df: pd.DataFrame) -> pd.DataFrame:
+    """Generates sentiment scores using nltk sid module. 
+
+    Args:
+        df (pd.Dataframe): Df with column 'text' to analyze.
+
+    Returns:
+        pd.DataFrame: Df with additional columns negative, neutral, positive, and compound sentiment scores. 
+    """
+    
+    nltk.download('vader_lexicon')
     sid = SentimentIntensityAnalyzer()
 
     def get_sentiment_scores(text):
         return sid.polarity_scores(text)
     
-    df['sentiment_scores'] = text.apply(get_sentiment_scores)
+    df['sentiment_scores'] = df['text'].apply(get_sentiment_scores)
 
     # Create separate columns for each sentiment score
     df['negative'] = df['sentiment_scores'].apply(lambda x: x['neg'])
@@ -91,12 +143,21 @@ def sentiment_analysis(text, df):
     df['positive'] = df['sentiment_scores'].apply(lambda x: x['pos'])
     df['compound'] = df['sentiment_scores'].apply(lambda x: x['compound'])
 
-    # Optionally, drop the 'sentiment_scores' column if you don't need it
+    # Drop original sentiment score column
     df = df.drop('sentiment_scores', axis=1)
     
     return df
 
-def generate_topics(text, df):
+def generate_topics(df: pd.DataFrame)-> pd.DataFrame:
+    """Generates topics use lda module from genism. 
+
+    Args:
+        df (pd.DataFrame): Df containing column 'text' to be analyzed.
+
+    Returns:
+        pd.DataFrame: Df of features updated with topic column. 
+    """
+    text = df['clean_text']
     dictionary = corpora.Dictionary(text)
     corpus = [dictionary.doc2bow(text) for text in text]
     
@@ -107,35 +168,74 @@ def generate_topics(text, df):
         return max(lda_model[bow], key=lambda x: x[1])[0] if lda_model[bow] else -1
     
     df['topic'] = text.apply(get_topics)
+    df['topic'] = df['topic'].astype('category')
+    
     return df
-    
-def generate_analysis(text: pd.Series) -> pd.DataFrame:
-    X_text, X_feature = count_punctuation(text)
-    
-    X_feature['length'] = X_text.apply(len)
-    X_feature['capitals'] = X_text.apply(capital_ratio)
-    
-    X_text = preprocess(X_text)
 
-    X_feature['profanity'] = X_text.apply(count_profanity)
-    X_feature = sentiment_analysis(text, X_feature)
-    
-    X_feature = generate_topics(X_text, X_feature)
-    X_feature['topic'] = X_feature['topic'].astype('category')
+def str_length(df: pd.DataFrame)-> pd.DataFrame:
+    """Generates length column that describes length of original "text" column. 
 
+    Args:
+        df (pd.DataFrame): Pandas df containing column "text".
+
+    Returns:
+        pd.DataFrame: Original df with new column "length".
+    """
+    
+    df['length'] = df['text'].apply(len)
+    
+    return df
+ 
+def count_profanity(df: pd.DataFrame)-> pd.DataFrame:
+    """_summary_
+
+    Args:
+        df (pd.DataFrame): _description_
+
+    Returns:
+        pd.DataFrame: _description_
+    """
+    def count_profane(tweet: list) -> int:
+        return sum(1 for word in tweet if word in profane_words)
+    
+    df['profanity'] = df['text'].apply(count_profane)
+    
+    return df
+
+def generate_analysis(df: pd.DataFrame) -> pd.DataFrame:
+    """Generate features from tweets
+
+    Args:
+        df (pd.Series): Pandas dataframe that contains a column called "text".
+
+    Returns:
+        pd.DataFrame: Dataframe with engineered features
+    """
+    
+    #pre process to remove stopwords, lowercase, and tokenize
+    X_feature = preprocess(df)
+    
+    #create features
+    X_feature = count_punctuation(X_feature)        
+    X_feature = str_length(X_feature)    
+    X_feature = capital_ratio(X_feature)
+    X_feature = count_profanity(X_feature)
+    X_feature = sentiment_analysis(X_feature)
+    X_feature = generate_topics(X_feature)
+    
     return X_feature
 
-def generate_features(df: pd.DataFrame, flag: int, file: str) -> pd.DataFrame:
-    """Generates features based on text column in df using multiple frameworks. Flag 0 uses 
+def generate_features(df: pd.DataFrame, file: str) -> pd.DataFrame:
+    """Generates features based on text column in df using multiple frameworks. Saves to file or pulls from file if it exsists.
 
     Args:
         df (pd.DataFrame): Pandas df containing a column text.
-        flag (int): Value between 0 and 0 indicating which method to use. 
-
+        file (str): String containing the name for save
+        
     Returns:
         pd.DataFrame: Dataframe of features. 
     """
-    filename = f"{file}_{flag}.pkl"
+    filename = f"{file}_log_reg.pkl"
     
     #either load file or generate file
     if (os.path.exists(filename)):
@@ -143,21 +243,32 @@ def generate_features(df: pd.DataFrame, flag: int, file: str) -> pd.DataFrame:
         with open(filename, 'rb') as f:
             features = pickle.load(f)
     else:
-        if (flag == 3):
-            features = generate_analysis(df['text'])
-        #save file
+        features = generate_analysis(df)
+        features = features.drop(['text', 'clean_text', 'label', 'category', 'demographic', 'perspective_score'], axis=1, errors='ignore')
         with open(filename, 'wb') as f:
             pickle.dump(features, f)
-    
+            
+    return features
+
+def scale_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Scales the features in a df using robust scaler from scikit-learn.
+
+    Args:
+        df (pd.DataFrame): Pandas df containing features.
+
+    Returns:
+        pd.DataFrame: Original df with features scaled. 
+    """
+    #scale features to improve model performance
     scaler = RobustScaler()
-    X_scaled = pd.DataFrame(scaler.fit_transform(features))
+    X_scaled = pd.DataFrame(scaler.fit_transform(df))
     return X_scaled
 
 def false_positive_rate(y_true, y_pred):
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred,labels = ['NOT', 'OFF']).ravel()
     return fp / (fp + tn)
 
-def generate_model(X: pd.DataFrame, y: pd.Series, flag: int)-> LogisticRegression:
+def generate_model(X: pd.DataFrame, y: pd.Series)-> LogisticRegression:
     """Generates a logistic regression model using X and y to train with model selection based on flag.
 
     Args:
@@ -167,7 +278,7 @@ def generate_model(X: pd.DataFrame, y: pd.Series, flag: int)-> LogisticRegressio
     Returns:
         LogisticRegression: Logistic regression model. 
     """
-    filename = f"model_{flag}.pkl"
+    filename = f"model_log_reg.pkl"
     
     #either load file or generate file
     if (os.path.exists(filename)):
@@ -175,24 +286,14 @@ def generate_model(X: pd.DataFrame, y: pd.Series, flag: int)-> LogisticRegressio
         with open(filename, 'rb') as f:
             model = pickle.load(f)
     else:   
-        # Define the parameter grid
-        if flag == 3:
-            param_grid = {
-                'C': [0.001, 0.1, 100], #[0.001, 0.01, 0.1, 1, 10, 100, 1000],
-                'penalty': ['l1', 'l2'],
-                'solver': ['liblinear', 'saga'],
-                'max_iter': [1000,2500],
-                'tol': [1e-3]
-            }
-        else:
-            param_grid = {
-                'C': [0.001, 0.01, 0.1, 1], #tighten regularization because models are large
-                'penalty': ['l1', 'elasticnet'],
-                'solver': ['saga'],
-                'max_iter': [1000,2500],
-                'l1_ratio': [0.1, 0.5, 0.9],
-                'tol': [1e-3]
-            }
+        # Define the parameter grid:
+        param_grid = {
+            'C': [0.001, 0.01, 0.1, 1],
+            'penalty': ['l1', 'l2'],
+            'solver': ['liblinear', 'saga'],
+            'max_iter': [1000,2500],
+            'tol': [1e-3]
+        }
 
         # Create the logistic regression model
         log_reg = LogisticRegression(random_state=42)
@@ -287,6 +388,15 @@ def fpr_demographic(df: pd.DataFrame, y_pred: pd.Series) -> dict:
     return fpr_by_demographic
 
 def classify(X: pd.Series, threshold: float) -> pd.Series:
+    """Classifies datapoints based on a threshold
+
+    Args:
+        X (pd.Series): Pandas series of data points
+        threshold (float): Float threshold to use as the classification boundary
+
+    Returns:
+        pd.Series: Data points classified as 'OFF' or 'NOT'
+    """
     y = X > threshold
 
     return y.replace({True: 'OFF', False: 'NOT'})
@@ -337,31 +447,31 @@ if __name__ == "__main__":
     #import data
     df_train = pd.read_csv(TRAIN_FILE, delimiter= "\t")
     df_dev = pd.read_csv(DEV_FILE, delimiter = "\t")
-    #df_test = pd.read_csv(TEST_FILE, delimiter = "\t")
     df_demographic = pd.read_csv(DEMOGRAPHIC_FILE, delimiter= "\t")
-    df_demographic['label'] = "NOT"
-    #df_test['label'] = "NOT" # just so classify runs
-    print("data imported successfully!")
     
-    flag = 3
-    #generate features -> scaled
-    X_train = generate_features(df_train, flag, "features")
-    print("features generated!")
+    #add target column for demographic file 
+    df_demographic['label'] = "NOT"
+    print("Data imported successfully!")
+    
+    #generate features and scales (scaling features improves model performance)
+    X_train = generate_features(df_train, "features")
+    X_train = scale_features(X_train)
+    print("Features generated successfully!")
     
     #train model
-    model = generate_model(X_train, df_train['label'], flag)
-    #("model trained!")
+    model = generate_model(X_train, df_train['label'])
+    print("Model Trained!")
     
-    #generate feature
-    X_dev = generate_features(df_dev, flag, "dev")
-    X_demographics = generate_features(df_demographic, flag, "demographics")
-    #X_test = generate_features(df_test, flag, "test")
-    print("dev features generated")
+    #generate features
+    X_dev = generate_features(df_dev, "dev")
+    X_dev = scale_features(X_dev)
+    X_demographics = generate_features(df_demographic, "demographics")
+    X_demographics = scale_features(X_demographics)
+    print("Dev features generated")
     
     #adjust threshold 
     df_dev['pred'] = select_threshold(model, X_dev, df_dev['label'], True)
     df_demographic['pred'] = select_threshold(model, X_demographics, df_demographic['label'], False)
-    #df_test['pred'] = select_threshold(model, X_test, df_test['label'], False) #just clasifies based on threshold
 
     #run evaluations
     metrics_dev = run_metrics(df_dev['label'], df_dev['pred'])
@@ -370,6 +480,5 @@ if __name__ == "__main__":
     #output_file = 'Julie_Lawler_test.tsv'
     #df_test[['pred']].to_csv(output_file, sep='\t', index=False, header=True)
 
-    #print(flag)
-    #print(metrics_dev)
-    #print(fpr_demo)
+    print(metrics_dev)
+    print(fpr_demo)
