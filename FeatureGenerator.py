@@ -10,9 +10,12 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from collections import Counter
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from nltk.stem import WordNetLemmatizer
 from gensim import corpora
 from gensim.models import LdaModel
 from sklearn.preprocessing import RobustScaler
+
+NRC_FILE = "NRC-emotion.txt"
 
 #credit for this list goes to better_profanity package
 profane_words = pd.read_csv("Profanity_Wordlist.txt", header =None, names = ['word'])
@@ -39,6 +42,7 @@ class FeatureGenerator:
         Preprocess data by tokenizing, lowercasing, and removing stopwords. 
         """
         nltk.download('stopwords')
+        nltk.download('wordnet')
         stop_words = set(stopwords.words('english'))
         stop_words.add("user")
 
@@ -55,9 +59,14 @@ class FeatureGenerator:
             return [w for w in sentence if not w.lower() in stop_words]
 
         text = text.apply(filter_stopwords)
-        
         self.df['clean_text'] = text
 
+        lemmatizer = WordNetLemmatizer()
+        def lemmatize_tokens(tokens):
+            return [lemmatizer.lemmatize(token) for token in tokens]
+        
+        self.df['lemma_text'] = text.apply(lemmatize_tokens)
+        
     def add_punctuation_count(self):
         """
         Counts the number of punctuation marks in each tweet.
@@ -140,7 +149,7 @@ class FeatureGenerator:
         def count_profane(tweet: list) -> int:
             return sum(1 for word in tweet if word in profane_words)
         
-        self.df['profanity'] = self.df['text'].apply(count_profane)
+        self.df['profanity'] = self.df['clean_text'].apply(count_profane)
         self.feature_names.append('profanity')
 
     def scale_features(self):
@@ -151,3 +160,33 @@ class FeatureGenerator:
         scaler = RobustScaler()
         features = self.get_features()
         self.features = pd.DataFrame(scaler.fit_transform(features))
+    
+    def add_word_count(self, word: str):
+        """
+        Counts the number of occurences of a given words in each tweet
+        
+        Accepts string to look for as input. 
+        """
+        def count_profane(tweet: list) -> int:
+            return sum(1 for token in tweet if word == token)
+        
+        self.df[f"{word}_count"] = self.df['clean_text'].apply(count_profane)
+        self.feature_names.append(f"{word}_count")
+    
+    def add_emotion_count(self, emotion: str):
+        """Counts the occurences of words related to a given emotion
+
+        Args:
+            emotion (str): Str flag for emotion to search for. Can be 'anger', 'anticipation', 'disgust', 'fear', 'negative', 'positive', 'sadness', 'surprise', 'trust'
+        """
+        df_nrc = pd.read_csv(NRC_FILE, delimiter='\t', names = ['word', 'emote', 'class'])
+        
+        #take cases where the word represents the emotion
+        emotion_words = df_nrc[(df_nrc['emote'] == emotion) & (df_nrc['class'] == 1)]['word'].tolist()
+
+        def count_profane(tweet: list) -> int:
+            return sum(1 for word in tweet if word in emotion_words)
+        
+        #count occurances
+        self.df[emotion] = self.df['lemma_text'].apply(count_profane)
+        self.feature_names.append(emotion)
