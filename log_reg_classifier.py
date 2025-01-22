@@ -5,6 +5,7 @@ import FeatureGenerator
 import HateSpeechClassifier
 from HateSpeechClassifier import *
 from FeatureGenerator import *
+from MetricsGenerator import *
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score, confusion_matrix, f1_score, confusion_matrix
 
@@ -125,8 +126,12 @@ if __name__ == "__main__":
     df_demographic['pred'] = classifier.predict(X_demographics)
 
     #run evaluations
-    metrics_dev = run_metrics(df_dev['label'], df_dev['pred'])
-    fpr_demo = fpr_demographic(df_demographic, df_demographic['pred'])  
+    metrics = MetricsGenerator(df_dev, df_demographic, df_dev['pred'], df_demographic['pred'])
+    fpr = metrics.fpr()
+    metrics_dev = metrics.run_metrics()
+    fpr_demo = metrics.fpr_demographic()
+    # metrics_dev = run_metrics(df_dev['label'], df_dev['pred'])
+    # fpr_demo = fpr_demographic(df_demographic, df_demographic['pred'])  
 
     print(metrics_dev)
     print(fpr_demo)
