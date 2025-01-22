@@ -35,13 +35,8 @@ class FeatureGenerator:
         return self.features
 
     def preprocess(self):
-        """Preprocess data by tokenizing, lowercasing, and removing stopwords. 
-
-        Args:
-            df (pd.Dataframe): Pandas dataframe of containing 'text' column to process.
-
-        Returns:
-            pd.Dataframe: Original df with new column 'clean_text'.
+        """
+        Preprocess data by tokenizing, lowercasing, and removing stopwords. 
         """
         nltk.download('stopwords')
         stop_words = set(stopwords.words('english'))
@@ -66,7 +61,6 @@ class FeatureGenerator:
     def add_punctuation_count(self):
         """
         Counts the number of punctuation marks in each tweet.
-        
         """
         punctuation = string.punctuation
 
@@ -84,13 +78,8 @@ class FeatureGenerator:
         self.feature_names.extend(X_counts.columns)
 
     def add_capital_ratio(self):
-        """Generates new column with the ratio of capital to non-capital letters.
-
-        Args:
-            df (pd.DataFrame): Pandas df containing the columm 'text'
-
-        Returns:
-            pd.DataFrame: Same df with a new column 'capitals'
+        """
+        Generates new column with the ratio of capital to non-capital letters.
         """
         #remove punctuation to prevent skew
         def remove_punctuation(tweet):
@@ -114,13 +103,8 @@ class FeatureGenerator:
         self.feature_names.append('capitals')
 
     def add_sentiment_analysis(self):
-        """Generates sentiment scores using nltk sid module. 
-
-        Args:
-            df (pd.Dataframe): Df with column 'text' to analyze.
-
-        Returns:
-            pd.DataFrame: Df with additional columns negative, neutral, positive, and compound sentiment scores. 
+        """
+        Generates sentiment scores using nltk sid module. 
         """
         
         nltk.download('vader_lexicon')
@@ -142,26 +126,16 @@ class FeatureGenerator:
         self.feature_names.extend(['negative', 'neutral', 'positive', 'compound'])
 
     def add_str_length(self):
-        """Generates length column that describes length of original "text" column. 
-
-        Args:
-            df (pd.DataFrame): Pandas df containing column "text".
-
-        Returns:
-            pd.DataFrame: Original df with new column "length".
+        """
+        Generates length column that describes length of original "text" column. 
         """
         
         self.df['length'] = self.df['text'].apply(len)
         self.feature_names.append('length')
     
     def add_count_profanity(self):
-        """_summary_
-
-        Args:
-            df (pd.DataFrame): _description_
-
-        Returns:
-            pd.DataFrame: _description_
+        """
+        Counts the number of profane words in each tweet
         """
         def count_profane(tweet: list) -> int:
             return sum(1 for word in tweet if word in profane_words)
@@ -170,13 +144,8 @@ class FeatureGenerator:
         self.feature_names.append('profanity')
 
     def scale_features(self):
-        """Scales the features in a df using robust scaler from scikit-learn.
-
-        Args:
-            df (pd.DataFrame): Pandas df containing features.
-
-        Returns:
-            pd.DataFrame: Original df with features scaled. 
+        """
+        Scales the features in a df using robust scaler from scikit-learn.
         """
         #scale features to improve model performance
         scaler = RobustScaler()
