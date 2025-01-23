@@ -13,26 +13,6 @@ TRAIN_FILE = "civility_data/train.tsv"
 DEMOGRAPHIC_FILE = "civility_data/mini_demographic_dev.tsv"
 DEV_FILE = "civility_data/dev.tsv"
 
-def run_metrics(y_true: pd.Series, y_pred: pd.Series) -> dict:
-    """Runs metrics to evaluate results for classification
-
-    Args:
-        y_true (pd.Series): Pandas series of true values.
-        y_pred (pd.Series): Pandas series of predicted values.
-
-    Returns:
-        dict: Dictionary that contains the metrics accuracy, precision, recall, and fscore.
-    """
-    accuracy = accuracy_score(y_true, y_pred)
-    labels = ['OFF', 'NOT']
-    precision, recall, fscore, support = precision_recall_fscore_support(y_true, y_pred, average=None, zero_division=0, labels = labels)
-    return {
-        'accuracy': accuracy,
-        'precision': precision,
-        'recall': recall,
-        'fscore': fscore,
-    }
-
 def fpr(df: pd.DataFrame) -> float:
     """Calculates fpr for a df that contains the actual and prediction values.
 
@@ -88,6 +68,7 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """
         
     feature_generator = FeatureGenerator(df)
+    feature_generator.preprocess()
     feature_generator.add_punctuation_count()
     feature_generator.add_str_length()
     feature_generator.add_capital_ratio()
