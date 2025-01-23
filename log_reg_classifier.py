@@ -131,5 +131,9 @@ if __name__ == "__main__":
 
     metrics_dev_class = perspective.run_metrics_dev()
     metrics_demographic_class = perspective.run_metrics_dem()
-
+    fpr_class = perspective.fpr()
     fpr_demo_class = perspective.fpr_demographic()
+
+    compare = Comparison(fpr, fpr_demo, metrics_dev, fpr_class, fpr_demo_class, metrics_dev_class)
+
+    compare.compare()
