@@ -3,9 +3,13 @@ import sklearn
 import matplotlib.pyplot as plt
 import FeatureGenerator
 import HateSpeechClassifier
+import Comparison
+import score_classifier_class
 from HateSpeechClassifier import *
 from FeatureGenerator import *
 from MetricsGenerator import *
+from score_classifier_class import *
+from Comparison import *
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score, confusion_matrix, f1_score, confusion_matrix
 
@@ -13,49 +17,53 @@ TRAIN_FILE = "civility_data/train.tsv"
 DEMOGRAPHIC_FILE = "civility_data/mini_demographic_dev.tsv"
 DEV_FILE = "civility_data/dev.tsv"
 
-def fpr(df: pd.DataFrame) -> float:
-    """Calculates fpr for a df that contains the actual and prediction values.
+PERSPECTIVE_DEV_FILE = "civility_data/dev.tsv"
+PERSPECTIVE_DEMOGRAPHIC_FILE = "civility_data/mini_demographic_dev.tsv"
+PERSPECTIVE_THRESHOLD = 0.8
 
-    Args:
-        df (pd.DataFrame): Pandas df that contains 'label' and 'y_pred' column
+# def fpr(df: pd.DataFrame) -> float:
+#     """Calculates fpr for a df that contains the actual and prediction values.
 
-    Returns:
-        float: FPR for the dataframe.
-    """
-    #extract true and predicted values from the df
-    y_true = df['label']
-    y_pred = df['y_pred']
+#     Args:
+#         df (pd.DataFrame): Pandas df that contains 'label' and 'y_pred' column
 
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels = ['NOT', 'OFF']).ravel()
+#     Returns:
+#         float: FPR for the dataframe.
+#     """
+#     #extract true and predicted values from the df
+#     y_true = df['label']
+#     y_pred = df['y_pred']
 
-    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+#     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels = ['NOT', 'OFF']).ravel()
 
-    return fpr
+#     fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+
+#     return fpr
     
-def fpr_demographic(df: pd.DataFrame, y_pred: pd.Series) -> dict:
-    """Generate FPR for each unique demographic in a dataframe
+# def fpr_demographic(df: pd.DataFrame, y_pred: pd.Series) -> dict:
+#     """Generate FPR for each unique demographic in a dataframe
 
-    Args:
-        df (pd.DataFrame): Pandas df containing 'demographic' column and 'label' column.
-        y_pred (pd.Series): Pandas series with the predicted values for the df.
+#     Args:
+#         df (pd.DataFrame): Pandas df containing 'demographic' column and 'label' column.
+#         y_pred (pd.Series): Pandas series with the predicted values for the df.
 
-    Returns:
-        dict: Dictionary with the FPR for each demographic.
-    """
-    #add predictions to df
-    df['y_pred'] = y_pred
+#     Returns:
+#         dict: Dictionary with the FPR for each demographic.
+#     """
+#     #add predictions to df
+#     df['y_pred'] = y_pred
     
-    #extract all demographics
-    unique_demographics = df['demographic'].unique()
+#     #extract all demographics
+#     unique_demographics = df['demographic'].unique()
     
-    #initalize dictionary to hold fpr for each demographic
-    fpr_by_demographic = {}
+#     #initalize dictionary to hold fpr for each demographic
+#     fpr_by_demographic = {}
     
-    #calculate FPR for each demographic
-    for demographic in unique_demographics:
-        fpr_by_demographic[demographic] = fpr(df[df['demographic'] == demographic])
+#     #calculate FPR for each demographic
+#     for demographic in unique_demographics:
+#         fpr_by_demographic[demographic] = fpr(df[df['demographic'] == demographic])
         
-    return fpr_by_demographic
+#     return fpr_by_demographic
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """Generate features from tweets
@@ -111,8 +119,18 @@ if __name__ == "__main__":
     fpr = metrics.fpr()
     metrics_dev = metrics.run_metrics()
     fpr_demo = metrics.fpr_demographic()
-    # metrics_dev = run_metrics(df_dev['label'], df_dev['pred'])
-    # fpr_demo = fpr_demographic(df_demographic, df_demographic['pred'])  
 
-    print(metrics_dev)
-    print(fpr_demo)
+    df_dev_class = pd.read_csv(PERSPECTIVE_DEV_FILE, delimiter = "\t")
+    df_demographic_class = pd.read_csv(PERSPECTIVE_DEMOGRAPHIC_FILE, delimiter = "\t")
+
+    df_demographic_class['label'] = "NOT"
+
+    perspective = score_classifier_class(df_dev_class, df_demographic_class, PERSPECTIVE_THRESHOLD)
+
+    df_dev_class['pred'] = perspective.classify_dev()
+    df_demographic_class['pred'] = perspective.classify_demographic()
+
+    metrics_dev_class = perspective.run_metrics_dev()
+    metrics_demographic_class = perspective.run_metrics_dem()
+
+    fpr_demo_class = perspective.fpr_demographic()
