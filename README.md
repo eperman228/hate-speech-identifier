@@ -19,13 +19,14 @@ Instructions for installing the project. For example:
 git clone https://github.com/chase-lahner/T4G-Mini-Project-1---PerspectiveAPI-Hate-Speech-Classification
 
 # Navigate to the project directory
-cd <project-directory>
+cd T4G-Mini-Project-1---PerspectiveAPI-Hate-Speech-Classification
 
 # Install dependencies
 # Using pip
-pip install pandas scikit-learn nltk numpy
+pip install -r requirements/pip.txt
 # Using conda
-conda install -y python pandas scikit-learn nltk numpy
+conda create --name HSC_env --file requirements/conda.txt
+conda activate HSC_env
 ```
 
 ## How to Use
@@ -80,7 +81,15 @@ python main
   classifier.select_threshold() 
   df_dev['pred'] = classifier.predict(X_dev)
 ```
+## Acknowledgements
 
+- **[Professor Lorraine Li](https://lorraine333.github.io/)** - Thank you to Prof Li for providing the datasets and conceptual inspiration for this project.
+
+## Citations
+1. **[NRC Emotion Lexicon](https://saifmohammad.com/WebPages/NRC-Emotion-Lexicon.htm)**
+   - Mohammad, Saif M., and Turney, Peter D. (2013)
+
+2. **[Better Profanity Dataset](https://github.com/snguyenthanh/better_profanity)**
 
 ## License
 

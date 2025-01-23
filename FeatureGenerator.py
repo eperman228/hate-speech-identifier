@@ -11,11 +11,9 @@ from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.stem import WordNetLemmatizer
 from sklearn.preprocessing import RobustScaler
 
-NRC_FILE = "NRC-emotion.txt"
-
+NRC_FILE = "corpora/NRC-emotion.txt"
+PROFANITY_FILE = "corpora/Profanity_Wordlist.txt"
 #credit for this list goes to better_profanity package
-profane_words = pd.read_csv("Profanity_Wordlist.txt", header =None, names = ['word'])
-profane_words = profane_words['word'].tolist()
 
 class FeatureGenerator:
     """
@@ -140,8 +138,11 @@ class FeatureGenerator:
     
     def add_count_profanity(self):
         """
-        Counts the number of profane words in each tweet
+        Counts the number of profane words in each tweet.
         """
+        profane_words = pd.read_csv(PROFANITY_FILE, header =None, names = ['word'])
+        profane_words = profane_words['word'].tolist()
+
         def count_profane(tweet: list) -> int:
             return sum(1 for word in tweet if word in profane_words)
         
