@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import FeatureGenerator
 import HateSpeechClassifier
 import Comparison
-import score_classifier_class
+import ScoreClassifierClass
 from HateSpeechClassifier import *
 from FeatureGenerator import *
 from MetricsGenerator import *
-from score_classifier_class import *
+from ScoreClassifierClass import *
 from Comparison import *
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score, confusion_matrix, f1_score, confusion_matrix
@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
     df_demographic_class['label'] = "NOT"
 
-    perspective = score_classifier_class(df_dev_class, df_demographic_class, PERSPECTIVE_THRESHOLD)
+    perspective = ScoreClassifierClass(df_dev_class, df_demographic_class, PERSPECTIVE_THRESHOLD)
 
     df_dev_class['pred'] = perspective.classify_dev()
     df_demographic_class['pred'] = perspective.classify_demographic()

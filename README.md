@@ -71,8 +71,7 @@ python main
   - `generate_model()`: Returns a LogisticRegression model.
   - `select_threshold()`: Adjusts classification threshold to lowest sensitivity with accuracy above 70%. 
   - `predict()`: Classifies as hate speech. Returns pd.series of predictions.
-
-- **Usage**: 
+ - **Usage**: 
 ```python
   from HateSpeechClassifier import *
   
@@ -81,23 +80,37 @@ python main
   classifier.select_threshold() 
   df_dev['pred'] = classifier.predict(X_dev)
 ```
-## Acknowledgements
+#### 3. MetricsGenerator
+- **Purpose**: Return key metrics from custom lotistic regression model to evaluate effectiveness
+- **Key Methods**:
+  - `__init__(df_dev, df_demographic, dev_y_pred, dem_y_pred)`: create MetricsGenerator object, given two dataframes and associated model predictions
+  - `fpr()`: calculates false positive rate for a df that contains actual and prediction values
+  - `fpr_demographic()`: calculates false postitive rate for each unique demographic in the dataframe
+  `run_metrics()`: returns accuracy, precision, recall, and fscore of given model
 
+#### 4. ScoreClassifierClass
+- **Purpose**: Create a classifier model to classify messages based off PerspectiveAPI scores
+- **Key Methods**:
+  - `__init__(df_dev, def_demographic, threshold)`: create a ScoreClassifierClass object, given two dataframes and a classification threshold
+  - `classify_dev()`: classifies df_dev dataframe based on threshold
+  - `classify_demographic()`: classifies df_demographic dataframe based on threshold
+  - `run_metrics_dev()`: returns accuracy, precision, recall, and fscore of dev model
+  - `run_metrics_dem()`: returns accuracy, precision, recall, and fscore of dev model
+  - `fpr()`: returns fpr of a df that contains the actual and prediction values
+  - `fpr_demographic()`: returns fpr for each unique demographic in a dataframe
+
+## Acknowledgements
 - **[Professor Lorraine Li](https://lorraine333.github.io/)** - Thank you to Prof Li for providing the datasets and conceptual inspiration for this project.
 
 ## Citations
 1. **[NRC Emotion Lexicon](https://saifmohammad.com/WebPages/NRC-Emotion-Lexicon.htm)**
    - Mohammad, Saif M., and Turney, Peter D. (2013)
-
 2. **[Better Profanity Dataset](https://github.com/snguyenthanh/better_profanity)**
 
 ## License
-
 This project is licensed under the [MIT License](LICENSE).
 
 ## Contact
-
-Provide contact information for feedback or support. For example:
 
 - Name: Julie Lawler
 - Email: jal355@pitt.eud
