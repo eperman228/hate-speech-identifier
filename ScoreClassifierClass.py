@@ -2,7 +2,7 @@ import sklearn
 import pandas as pd
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score, confusion_matrix
 
-class score_classifier_class:
+class ScoreClassifierClass:
     def __init__(self, df_dev, df_demographic, threshold):
         self.df_dev = df_dev
         self.df_demographic = df_demographic

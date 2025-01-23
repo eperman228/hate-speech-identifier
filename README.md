@@ -81,6 +81,25 @@ python main
   df_dev['pred'] = classifier.predict(X_dev)
 ```
 
+#### 3. MetricsGenerator
+- **Purpose**: Return key metrics from custom lotistic regression model to evaluate effectiveness
+- **Key Methods**:
+  - `__init__(df_dev, df_demographic, dev_y_pred, dem_y_pred)`: create MetricsGenerator object, given two dataframes and associated model predictions
+  - `fpr()`: calculates false positive rate for a df that contains actual and prediction values
+  - `fpr_demographic()`: calculates false postitive rate for each unique demographic in the dataframe
+  `run_metrics()`: returns accuracy, precision, recall, and fscore of given model
+
+#### 4. ScoreClassifierClass
+- **Purpose**: Create a classifier model to classify messages based off PerspectiveAPI scores
+- **Key Methods**:
+  - `__init__(df_dev, def_demographic, threshold)`: create a ScoreClassifierClass object, given two dataframes and a classification threshold
+  - `classify_dev()`: classifies df_dev dataframe based on threshold
+  - `classify_demographic()`: classifies df_demographic dataframe based on threshold
+  - `run_metrics_dev()`: returns accuracy, precision, recall, and fscore of dev model
+  - `run_metrics_dem()`: returns accuracy, precision, recall, and fscore of dev model
+  - `fpr()`: returns fpr of a df that contains the actual and prediction values
+  - `fpr_demographic()`: returns fpr for each unique demographic in a dataframe
+
 
 ## License
 
