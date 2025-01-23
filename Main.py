@@ -19,7 +19,6 @@ DEV_FILE = "civility_data/dev.tsv"
 
 PERSPECTIVE_DEV_FILE = "civility_data/dev.tsv"
 PERSPECTIVE_DEMOGRAPHIC_FILE = "civility_data/mini_demographic_dev.tsv"
-PERSPECTIVE_THRESHOLD = 0.8
 
 def import_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -59,43 +58,41 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     feature_generator.scale_features()
     return feature_generator.get_features()
 
-def generate_classifier(X_train, df_train)-> tuple[LogisticRegression, HateSpeechClassifier]:
+def generate_classifier(X, y)-> tuple[LogisticRegression, HateSpeechClassifier]:
     """Generates model from engineered features and original data. 
 
     Args:
-        X_train (_type_): Engineered features df. 
-        df_train (_type_): Complete df including labels. 
+        X (pd.DataFrame): Engineered features df. 
+        y (pd.Series): Series containing true labels for df 
 
     Returns:
         LogisticRegression: Model trained using train. 
     """
-    #train model
-    classifier = HateSpeechClassifier(X_train, df_train['label'])
-    model = classifier.generate_model()
-    classifier.select_threshold()
+    #pull actual values from df
+    classifier = HateSpeechClassifier(X, y)
+    classifier.set_threshold(threshold=0.7)
+    model = classifier.generate_model('med') #low, med, high
+    classifier.optimize_threshold(goal_accuracy=0.7)
     return model, classifier
 
-def generate_predictions(classifier, df_dev, df_demographics):
+def generate_predictions(classifier, df_dev, df_demographic):
     #generate features
     X_dev = generate_features(df_dev)
     X_demographics = generate_features(df_demographic)
-    print("Dev features generated")
     
+    #generate predictions    
     pred_dev = classifier.predict(X_dev)
     pred_dem = classifier.predict(X_demographics)
     
     return pred_dev, pred_dem
 
-def generate_perspective():
-    df_dev_class = pd.read_csv(PERSPECTIVE_DEV_FILE, delimiter = "\t")
-    df_demographic_class = pd.read_csv(PERSPECTIVE_DEMOGRAPHIC_FILE, delimiter = "\t")
+def generate_perspective(df_dev, df_demographic):
+    #classify 
+    threshold = 0.7
+    perspective = ScoreClassifierClass(df_dev, df_demographic, threshold)
 
-    df_demographic_class['label'] = "NOT"
-
-    perspective = ScoreClassifierClass(df_dev_class, df_demographic_class, PERSPECTIVE_THRESHOLD)
-
-    df_dev_class['pred'] = perspective.classify_dev()
-    df_demographic_class['pred'] = perspective.classify_demographic()
+    df_dev['pred'] = perspective.classify_dev()
+    df_demographic['pred'] = perspective.classify_demographic()
     
     metrics_dev_class = perspective.run_metrics_dev()
     metrics_demographic_class = perspective.run_metrics_dem()
@@ -122,11 +119,11 @@ if __name__ == "__main__":
     df_train, df_dev, df_demographic = import_data()
     
     #perspectiveAPI model
-    fpr_class, fpr_demo_class, metrics_dev_class = generate_perspective()
+    fpr_class, fpr_demo_class, metrics_dev_class = generate_perspective(df_dev, df_demographic)
     
     #create custom model
     X_train = generate_features(df_train)
-    model, classifier = generate_classifier(X_train, df_train)    
+    model, classifier = generate_classifier(X_train, df_train['label'])    
     df_dev['pred'], df_demographic['pred'] = generate_predictions(classifier, df_dev, df_demographic)
 
     #run evaluations

@@ -17,7 +17,7 @@ class HateSpeechClassifier:
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred,labels = ['NOT', 'OFF']).ravel()
         return fp / (fp + tn)
    
-    def generate_model(self)-> LogisticRegression:
+    def generate_model(self, train_mode)-> LogisticRegression:
         """
         Generates a logistic regression model using X and y to train with model selection based on flag.
         
@@ -26,13 +26,35 @@ class HateSpeechClassifier:
         """
         
         # Define the parameter grid:
-        param_grid = {
-            'C': [0.001, 0.01, 0.1, 1],
-            'penalty': ['l1', 'l2'],
-            'solver': ['liblinear', 'saga'],
-            'max_iter': [1000,2500],
-            'tol': [1e-3]
-        }
+        if train_mode == 'low':
+            param_grid = {
+                'C': [100],
+                'penalty': ['l2'],
+                'solver': ['newton-cg'],
+                'max_iter': [500],
+                'tol': [0.001]
+            }
+        if train_mode == 'med':
+            param_grid = {
+                'solver': ['lbfgs'],  # Reduce solver options.
+                'penalty': ['l2'],  # Keep one penalty type.
+                'C': [0.001, 0.01, 1, 10],  # Select a subset of values for regularization.
+                'max_iter': [500, 1000],  # Use fewer iteration options.
+                'tol': [1e-4, 1e-3],  # Keep fewer tolerance values.
+                'fit_intercept': [True],  # Keep this as is (only one option).
+                'class_weight': [None]  # Reduce class weighting options.
+            }
+        if train_mode == 'high':
+            param_grid = {
+                'solver': ['lbfgs', 'newton-cg'],
+                'penalty': ['l2', 'none'],
+                'C': [0.0001, 0.001, 0.01, 0.1, 1, 10, 100],
+                'max_iter': [500, 1000, 2500, 5000],
+                'tol': [1e-4, 1e-3, 1e-2],
+                'fit_intercept': [True],
+                'class_weight': [None, 'balanced']
+            }
+
 
         # Create the logistic regression model
         log_reg = LogisticRegression(random_state=42)
@@ -46,15 +68,16 @@ class HateSpeechClassifier:
         model = GridSearchCV(
             log_reg, 
             param_grid, 
-            cv=5,  
             scoring=scoring,
             verbose=1,
             n_jobs=-1,  
+            cv = 5,
             refit='accuracy'
         )
 
         model.fit(self.X, self.y)
             
+        print(model.best_params_)
         self.model = model.best_estimator_
         return self.model
     
@@ -72,7 +95,7 @@ class HateSpeechClassifier:
 
         return y.replace({True: 'OFF', False: 'NOT'})
 
-    def select_threshold(self):
+    def optimize_threshold(self, goal_accuracy: float):
         #get probability of offensive
         y_prob = pd.Series(self.model.predict_proba(self.X)[:, 1])
         
@@ -81,35 +104,41 @@ class HateSpeechClassifier:
         
         # Lists to store FPR and accuracy values
         fpr_values = []
-        f1_values = []
+        accuracy_values = []
 
         labels = ['NOT', 'OFF']
         for value in thresholds:
             y_pred = self.classify(y_prob, value)
             fpr = self.false_positive_rate(self.y, y_pred)
-            precision, recall, fscore, support = precision_recall_fscore_support(self.y, y_pred, average='weighted', zero_division=0, labels = labels)
+            accuracy = accuracy_score(self.y, y_pred)
 
             # Store FPR and accuracy for the current threshold
             fpr_values.append(fpr)
-            f1_values.append(fscore)
+            accuracy_values.append(accuracy)
         
-        values = pd.DataFrame({'threshold': thresholds, "f1": f1_values, 'fpr': fpr_values})
+        values = pd.DataFrame({'threshold': thresholds, "accuracy": accuracy_values, 'fpr': fpr_values})
         
         pd.set_option('display.max_rows', None)  # Disable row truncation
-        #print(values[values['f1'] > .7])
+
         # Plot Threshold vs. FPR and Accuracy
         plt.figure(figsize=(10, 6))
         plt.plot(thresholds, fpr_values, label='False Positive Rate (FPR)', color='red')
-        plt.plot(thresholds, f1_values, label='F1', color='blue')
+        plt.plot(thresholds, accuracy_values, label='Accuracy', color='blue')
         plt.xlabel('Threshold')
         plt.ylabel('Score')
-        plt.title('Threshold vs. F1 and FPR')
+        plt.title('Threshold vs. Accuracy and FPR')
         plt.legend()
         plt.grid(True)
         plt.savefig("classify.png")
         
-        self.threshold = values[values['f1'] > .7]['threshold'].max()
+        self.threshold = values[values['accuracy'] > goal_accuracy]['threshold'].max()
+        if pd.isna(self.threshold):
+            self.threshold = (values.sort_values(by='accuracy', ascending=False))['threshold'].iloc[0]
+            print(f"Accuracy goal not hit. Threshold {self.threshold} instead.")
     
+    def set_threshold(self, threshold):
+        self.threshold = threshold
+        
     def predict(self, X):
         y = pd.Series(self.model.predict_proba(X)[:, 1])
         return self.classify(y, self.threshold)
