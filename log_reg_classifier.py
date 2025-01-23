@@ -110,7 +110,6 @@ if __name__ == "__main__":
     X_demographics = generate_features(df_demographic)
     print("Dev features generated")
     
-    #adjust threshold 
     df_dev['pred'] = classifier.predict(X_dev)
     df_demographic['pred'] = classifier.predict(X_demographics)
 
