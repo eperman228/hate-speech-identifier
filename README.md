@@ -19,13 +19,14 @@ Instructions for installing the project. For example:
 git clone https://github.com/chase-lahner/T4G-Mini-Project-1---PerspectiveAPI-Hate-Speech-Classification
 
 # Navigate to the project directory
-cd <project-directory>
+cd T4G-Mini-Project-1---PerspectiveAPI-Hate-Speech-Classification
 
 # Install dependencies
 # Using pip
-pip install pandas scikit-learn nltk numpy
+pip install -r requirements/pip.txt
 # Using conda
-conda install -y python pandas scikit-learn nltk numpy
+conda create --name HSC_env --file requirements/conda.txt
+conda activate HSC_env
 ```
 
 ## How to Use
@@ -70,8 +71,7 @@ python main
   - `generate_model()`: Returns a LogisticRegression model.
   - `select_threshold()`: Adjusts classification threshold to lowest sensitivity with accuracy above 70%. 
   - `predict()`: Classifies as hate speech. Returns pd.series of predictions.
-
-- **Usage**: 
+ - **Usage**: 
 ```python
   from HateSpeechClassifier import *
   
@@ -80,7 +80,6 @@ python main
   classifier.select_threshold() 
   df_dev['pred'] = classifier.predict(X_dev)
 ```
-
 #### 3. MetricsGenerator
 - **Purpose**: Return key metrics from custom lotistic regression model to evaluate effectiveness
 - **Key Methods**:
@@ -100,14 +99,18 @@ python main
   - `fpr()`: returns fpr of a df that contains the actual and prediction values
   - `fpr_demographic()`: returns fpr for each unique demographic in a dataframe
 
+## Acknowledgements
+- **[Professor Lorraine Li](https://lorraine333.github.io/)** - Thank you to Prof Li for providing the datasets and conceptual inspiration for this project.
+
+## Citations
+1. **[NRC Emotion Lexicon](https://saifmohammad.com/WebPages/NRC-Emotion-Lexicon.htm)**
+   - Mohammad, Saif M., and Turney, Peter D. (2013)
+2. **[Better Profanity Dataset](https://github.com/snguyenthanh/better_profanity)**
 
 ## License
-
 This project is licensed under the [MIT License](LICENSE).
 
 ## Contact
-
-Provide contact information for feedback or support. For example:
 
 - Name: Julie Lawler
 - Email: jal355@pitt.eud
