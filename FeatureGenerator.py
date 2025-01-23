@@ -1,6 +1,4 @@
 import pandas as pd
-import pickle
-import os.path
 import string
 import nltk
 import numpy as np
@@ -11,8 +9,6 @@ from nltk.tokenize import word_tokenize
 from collections import Counter
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.stem import WordNetLemmatizer
-from gensim import corpora
-from gensim.models import LdaModel
 from sklearn.preprocessing import RobustScaler
 
 NRC_FILE = "NRC-emotion.txt"
