@@ -21,49 +21,23 @@ PERSPECTIVE_DEV_FILE = "civility_data/dev.tsv"
 PERSPECTIVE_DEMOGRAPHIC_FILE = "civility_data/mini_demographic_dev.tsv"
 PERSPECTIVE_THRESHOLD = 0.8
 
-# def fpr(df: pd.DataFrame) -> float:
-#     """Calculates fpr for a df that contains the actual and prediction values.
+def import_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Imports data from string literals.
 
-#     Args:
-#         df (pd.DataFrame): Pandas df that contains 'label' and 'y_pred' column
-
-#     Returns:
-#         float: FPR for the dataframe.
-#     """
-#     #extract true and predicted values from the df
-#     y_true = df['label']
-#     y_pred = df['y_pred']
-
-#     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels = ['NOT', 'OFF']).ravel()
-
-#     fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
-
-#     return fpr
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: Returns train, dev, and demographic data. 
+    """
+    #import data
+    df_train = pd.read_csv(TRAIN_FILE, delimiter= "\t")
+    df_dev = pd.read_csv(DEV_FILE, delimiter = "\t")
+    df_demographic = pd.read_csv(DEMOGRAPHIC_FILE, delimiter= "\t")
     
-# def fpr_demographic(df: pd.DataFrame, y_pred: pd.Series) -> dict:
-#     """Generate FPR for each unique demographic in a dataframe
+    #add target column for demographic file 
+    df_demographic['label'] = "NOT"
 
-#     Args:
-#         df (pd.DataFrame): Pandas df containing 'demographic' column and 'label' column.
-#         y_pred (pd.Series): Pandas series with the predicted values for the df.
-
-#     Returns:
-#         dict: Dictionary with the FPR for each demographic.
-#     """
-#     #add predictions to df
-#     df['y_pred'] = y_pred
-    
-#     #extract all demographics
-#     unique_demographics = df['demographic'].unique()
-    
-#     #initalize dictionary to hold fpr for each demographic
-#     fpr_by_demographic = {}
-    
-#     #calculate FPR for each demographic
-#     for demographic in unique_demographics:
-#         fpr_by_demographic[demographic] = fpr(df[df['demographic'] == demographic])
-        
-#     return fpr_by_demographic
+    #return data 
+    return df_train, df_dev, df_demographic
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """Generate features from tweets
@@ -85,40 +59,34 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     feature_generator.scale_features()
     return feature_generator.get_features()
 
-if __name__ == "__main__":
-    #import data
-    df_train = pd.read_csv(TRAIN_FILE, delimiter= "\t")
-    df_dev = pd.read_csv(DEV_FILE, delimiter = "\t")
-    df_demographic = pd.read_csv(DEMOGRAPHIC_FILE, delimiter= "\t")
-    
-    #add target column for demographic file 
-    df_demographic['label'] = "NOT"
-    print("Data imported successfully!")
-    
-    #generate features and scales (scaling features improves model performance)
-    X_train = generate_features(df_train)
-    print("Features generated successfully!")
-    
+def generate_classifier(X_train, df_train)-> tuple[LogisticRegression, HateSpeechClassifier]:
+    """Generates model from engineered features and original data. 
+
+    Args:
+        X_train (_type_): Engineered features df. 
+        df_train (_type_): Complete df including labels. 
+
+    Returns:
+        LogisticRegression: Model trained using train. 
+    """
     #train model
     classifier = HateSpeechClassifier(X_train, df_train['label'])
     model = classifier.generate_model()
     classifier.select_threshold()
-    print("Model Trained!")
-    
+    return model, classifier
+
+def generate_predictions(classifier, df_dev, df_demographics):
     #generate features
     X_dev = generate_features(df_dev)
     X_demographics = generate_features(df_demographic)
     print("Dev features generated")
     
-    df_dev['pred'] = classifier.predict(X_dev)
-    df_demographic['pred'] = classifier.predict(X_demographics)
+    pred_dev = classifier.predict(X_dev)
+    pred_dem = classifier.predict(X_demographics)
+    
+    return pred_dev, pred_dem
 
-    #run evaluations
-    metrics = MetricsGenerator(df_dev, df_demographic, df_dev['pred'], df_demographic['pred'])
-    fpr = metrics.fpr()
-    metrics_dev = metrics.run_metrics()
-    fpr_demo = metrics.fpr_demographic()
-
+def generate_perspective():
     df_dev_class = pd.read_csv(PERSPECTIVE_DEV_FILE, delimiter = "\t")
     df_demographic_class = pd.read_csv(PERSPECTIVE_DEMOGRAPHIC_FILE, delimiter = "\t")
 
@@ -128,12 +96,38 @@ if __name__ == "__main__":
 
     df_dev_class['pred'] = perspective.classify_dev()
     df_demographic_class['pred'] = perspective.classify_demographic()
-
+    
     metrics_dev_class = perspective.run_metrics_dev()
     metrics_demographic_class = perspective.run_metrics_dem()
+    
     fpr_class = perspective.fpr()
     fpr_demo_class = perspective.fpr_demographic()
+    
+    return fpr_class, fpr_demo_class, metrics_dev_class
 
+def run_metrics(df_dev, df_demographic, pred_dev, pred_dem):
+    metrics = MetricsGenerator(df_dev, df_demographic, pred_dev, pred_dem)
+    fpr = metrics.fpr()
+    metrics_dev = metrics.run_metrics()
+    fpr_demo = metrics.fpr_demographic()
+    
     compare = Comparison(fpr, fpr_demo, metrics_dev, fpr_class, fpr_demo_class, metrics_dev_class)
 
     compare.compare()
+    
+    return fpr, fpr_demo, metrics_dev
+    
+if __name__ == "__main__":
+    #load data
+    df_train, df_dev, df_demographic = import_data()
+    
+    #perspectiveAPI model
+    fpr_class, fpr_demo_class, metrics_dev_class = generate_perspective()
+    
+    #create custom model
+    X_train = generate_features(df_train)
+    model, classifier = generate_classifier(X_train, df_train)    
+    df_dev['pred'], df_demographic['pred'] = generate_predictions(classifier, df_dev, df_demographic)
+
+    #run evaluations
+    fpr, fpr_demo, metrics_dev = run_metrics(df_dev, df_demographic, df_dev['pred'], df_demographic['pred'])
